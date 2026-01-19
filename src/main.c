@@ -1,10 +1,17 @@
 #include<stdio.h>
 #include<stdlib.h>
 #include<string.h>
-
 #include<ctype.h>
+
 #include "../include/lexer.h"
 #include "../include/parser.h" 
+#include "../include/semantic.h"
+#include "../include/ir.h"
+#include "../include/cfg.h"
+#include "../include/opt.h"
+#include "../include/codegen.h"
+#include "../include/qbe_codegen.h"
+
 
 int main (int argc, char *argv[]) 
 {   
@@ -60,19 +67,44 @@ int main (int argc, char *argv[])
     fclose(file);
 
     // Now parse and generate IR from tokens[]
+    // Parse entire program
     int index = 0;
-    // ASTNode *astList[100]; // multiple statements
-    // int astCount = 0;
 
-    while (tokens[index].type != TOKEN_ERROR && tokens[index].type != TOKEN_EOF) {
-        ASTNode *ast = parse_statement(tokens, &index);
-        if (ast) {
-            // astList[astCount++] = ast;
-            printf("AST Structure:\n");
-            print_ast(ast, 0);
+    ASTNode *program = create_node(AST_BLOCK, NULL);
+    program->body = malloc(sizeof(ASTNode *) * 256);
+    program->body_size = 0;
+
+    while (tokens[index].type != TOKEN_ERROR &&
+        tokens[index].type != TOKEN_EOF) {
+
+        ASTNode *stmt = parse_statement(tokens, &index);
+        if (stmt) {
+            program->body[program->body_size++] = stmt;
         }
     }
 
+    // Semantic analysis (ONE PASS)
+    semantic_analyze(program);
+
+    // Constant Folding
+    program = opt_fold_constants(program);
+    //IR/TAC Generation
+    printf("\n===IR / TAC ===\n");
+    ir_generate(program);
+
+    // Control Flow Graph Construction
+    printf("\n=== CFG ===\n");
+    cfg_build(program);
+    cfg_print();
+
+    //Dead Code Elimination
+    opt_dead_code_elimination();
+
+    /* =========================
+   QBE Backend
+   ========================= */
+    qbe_codegen(program, "out.qbe");
+    printf("Generated QBE IR → out.qbe\n"); 
     // printf("\nGenerated TAC:\n");
     // for (int i = 0; i < astCount; i++) {
     //     generate_tac(astList[i]);

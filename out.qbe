@@ -1,0 +1,30 @@
+data $d_fmt = { b "%d\n", b 0 }
+
+export function w $printi(w %arg) {
+@entry
+    %r =w call $printf(l $d_fmt, w %arg, ...)
+    ret 0
+}
+
+export function w $main() {
+@entry
+    %num =l alloc4 4
+    %x =l alloc4 4
+    %y =l alloc4 4
+    %hex =l alloc4 4
+    %bin =l alloc4 4
+    %_bool =l alloc4 4
+    storew 42, %num
+    %t0 =w mul 2, 3
+    %t1 =w add 1, %t0
+    storew %t1, %x
+    %t2 =w loadw %x
+    %t3 =w call $printi(w %t2)
+    %t4 =w add 1, 2
+    %t5 =w mul %t4, 3
+    storew %t5, %y
+    storew 31, %hex
+    storew 10, %bin
+    storew 1, %_bool
+    ret 0
+}

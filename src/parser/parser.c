@@ -4,9 +4,94 @@
 #include "../../include/parser.h"
 #include "../../include/lexer.h"
 
-Symbol symbolTable[MAX_SYMBOLS];
-int symbol_table_size = 0;
-int symbolCount = 0;
+typedef enum {
+    PREC_NONE,
+    PREC_ASSIGNMENT,
+    PREC_EQUALITY,
+    PREC_COMPARISON,
+    PREC_TERM,
+    PREC_FACTOR,
+    PREC_UNARY,
+    PREC_PRIMARY
+} Precedence;
+
+ASTNode *parse_expression(Token tokens[], int *index);
+
+static Precedence get_precedence(Token *token) {
+    if (token->type != TOKEN_OPERATOR) return PREC_NONE;
+
+    if (strcmp(token->lexeme, "===") == 0 ||
+        strcmp(token->lexeme, "!==") == 0)
+        return PREC_EQUALITY;
+
+    if (strcmp(token->lexeme, "<") == 0 ||
+        strcmp(token->lexeme, ">") == 0 ||
+        strcmp(token->lexeme, "<=") == 0 ||
+        strcmp(token->lexeme, ">=") == 0)
+        return PREC_COMPARISON;
+
+    if (strcmp(token->lexeme, "+") == 0 ||
+        strcmp(token->lexeme, "-") == 0)
+        return PREC_TERM;
+
+    if (strcmp(token->lexeme, "*") == 0 ||
+        strcmp(token->lexeme, "/") == 0)
+        return PREC_FACTOR;
+
+    return PREC_NONE;
+}
+
+static ASTNode *parse_primary(Token tokens[], int *index) {
+    Token t = tokens[*index];
+
+    if (t.type == TOKEN_NUMBER || t.type == TOKEN_STRING ||
+        t.type == TOKEN_BOOLEAN) {
+        (*index)++;
+        return create_node(AST_LITERAL, t.lexeme);
+    }
+
+    if (t.type == TOKEN_IDENTIFIER) {
+        (*index)++;
+        return create_node(AST_IDENTIFIER, t.lexeme);
+    }
+
+    if (strcmp(t.lexeme, "(") == 0) {
+        (*index)++;
+        ASTNode *expr = parse_expression(tokens, index);
+        if (strcmp(tokens[*index].lexeme, ")") != 0) {
+            printf("Expected ')'\n");
+            exit(1);
+        }
+        (*index)++;
+        return expr;
+    }
+
+    printf("Unexpected token: %s\n", t.lexeme);
+    exit(1);
+}
+
+ASTNode *parse_expression_prec(Token tokens[], int *index, Precedence prec) {
+    ASTNode *left = parse_primary(tokens, index);
+
+    while (1) {
+        Precedence next_prec = get_precedence(&tokens[*index]);
+        if (next_prec < prec)
+            break;
+
+        Token op = tokens[*index];
+        (*index)++;
+
+        ASTNode *right = parse_expression_prec(tokens, index, next_prec + 1);
+
+        ASTNode *bin = create_node(AST_BINARY_OP, op.lexeme);
+        bin->left = left;
+        bin->right = right;
+        left = bin;
+    }
+
+    return left;
+}
+
 
 static char *strdup_safe(const char *s)
 {
@@ -21,42 +106,6 @@ static char *strdup_safe(const char *s)
     return copy;
 }
 
-
-int lookupSymbol(char *name)
-{
-    for (int i = 0; i < symbolCount; i++)
-    {
-        if (strcmp(symbolTable[i].name, name) == 0)
-        {
-            return i;
-        }
-    }
-    return -1;
-}
-
-void insertSymbol(char *name, char *type, char *scope, char *value, char *datatype_check)
-{
-    if (lookupSymbol(name) != -1)
-    {
-        printf("Error: Variable '%s' is already declared!\n", name);
-        return;
-    }
-    printf("Inserting Symbol: Name: %s, Type: %s, Scope: %s, Value: %s, Datatype: %s\n", 
-           name, type, scope, value, datatype_check);
-    if (symbolCount < MAX_SYMBOLS)
-    {
-        strcpy(symbolTable[symbolCount].name, name);
-        strcpy(symbolTable[symbolCount].type, type);
-        strcpy(symbolTable[symbolCount].scope, scope);
-        strcpy(symbolTable[symbolCount].value, value);
-        strcpy(symbolTable[symbolCount].datatype, datatype_check);
-        symbolCount++;
-    }
-    else
-    {
-        printf("Error: Symbol table overflow!\n");
-    }
-}
 
 ASTNode *parse_statement(Token tokens[], int *index);
 
@@ -85,32 +134,8 @@ char *check_binary_expr(char *leftType, char *rightType, char op)
     exit(1);
 }
 
-ASTNode *parse_expression(Token tokens[], int *index)
-{
-    Token token = tokens[*index];
-
-    if (token.type == TOKEN_NUMBER || token.type == TOKEN_STRING || 
-        token.type == TOKEN_IDENTIFIER || token.type == TOKEN_BOOLEAN)
-    {
-        (*index)++;
-        return create_node(AST_LITERAL, token.lexeme);
-    }
-
-    return NULL;
-}
-
-ASTNode *parse_condition(Token tokens[], int *index)
-{
-    ASTNode *identifier = create_node(AST_IDENTIFIER, tokens[*index].lexeme);
-    (*index)++;
-    ASTNode *condition = create_node(AST_BINARY_OP, tokens[*index].lexeme);
-    (*index)++;
-    ASTNode *value = create_node(AST_LITERAL, tokens[*index].lexeme);
-    condition->left = identifier;
-    condition->right = value;
-
-    (*index)++;
-    return condition;
+ASTNode *parse_expression(Token tokens[], int *index) {
+    return parse_expression_prec(tokens, index, PREC_ASSIGNMENT);
 }
 
 ASTNode *parse_assignment(Token tokens[], int *index)
@@ -127,25 +152,19 @@ ASTNode *parse_assignment(Token tokens[], int *index)
 
 ASTNode *parse_declaration(Token tokens[], int *index)
 {
-    Token keyword = tokens[*index];
+    // Token keyword = tokens[*index];
     (*index)++;
     Token identifier = tokens[*index];
     (*index)++;
     (*index)++; // Skip "="
-    Token value = tokens[*index];
+    // Token value = tokens[*index];
 
     ASTNode *varNode = create_node(AST_VAR_DECL, identifier.lexeme);
     ASTNode *assignNode = create_node(AST_ASSIGNMENT, "=");
     assignNode->left = varNode;
     assignNode->right = parse_expression(tokens, index);
     
-    const char *symbolType = (strcmp(keyword.lexeme, "let") == 0) ? "VARIABLE" : 
-                             (strcmp(keyword.lexeme, "const") == 0) ? "CONSTANT" : "UNDEFINED";
     
-    const char *datatype = (value.type == TOKEN_STRING) ? "string" : 
-                          (value.type == TOKEN_BOOLEAN) ? "boolean" : "number";
-    
-    insertSymbol(identifier.lexeme, (char*)symbolType, "LOCAL", value.lexeme, (char*)datatype);
     (*index)++; // Skip ";"
     return assignNode;
 }
@@ -182,7 +201,7 @@ ASTNode *parser_conditional_statement(Token tokens[], int *index)
         }
 
         (*index)++; // Skip "("
-        condition = parse_condition(tokens, index);
+        condition = parse_expression(tokens, index);
 
         if (tokens[*index].type != TOKEN_PUNCTUATION || strcmp(tokens[*index].lexeme, ")") != 0)
         {
@@ -341,7 +360,7 @@ ASTNode *parser_looping_statement(Token tokens[], int *index)
     
     if (strcmp(loopKey.lexeme, "while") == 0)
     {
-        ASTNode *condition = parse_condition(tokens, index);
+        ASTNode *condition = parse_expression(tokens, index);
         if (strcmp(tokens[*index].lexeme, ")") != 0)
         {
             printf("Error: Expected ')'\n");
@@ -388,7 +407,7 @@ ASTNode *parser_looping_statement(Token tokens[], int *index)
     {
         // Parse: for (init; condition; update)
         ASTNode *init = parse_for_init(tokens, index);  // Now handles both declarations and assignments
-        ASTNode *condition = parse_condition(tokens, index);
+        ASTNode *condition = parse_expression(tokens, index);
         (*index)++; // Skip ";"
         ASTNode *update = parse_update(tokens, index);
         
@@ -490,24 +509,6 @@ ASTNode *parse_statement(Token tokens[], int *index)
     return NULL;
 }
 
-void printSymbolTable()
-{
-    printf("\nSymbol Table:\n");
-    printf("----------------------------------------------------------------------------\n");
-    printf("| %-10s | %-10s | %-10s | %-15s | %-10s |\n", "Name", "Type", "Scope", "Value", "Datatype");
-    printf("----------------------------------------------------------------------------\n");
-
-    for (int i = 0; i < symbolCount; i++)
-    {
-        printf("| %-10s | %-10s | %-10s | %-15s | %-10s |\n",
-               symbolTable[i].name,
-               symbolTable[i].type,
-               symbolTable[i].scope,
-               symbolTable[i].value,
-               symbolTable[i].datatype);
-    }
-    printf("----------------------------------------------------------------------------\n");
-}
 
 ASTNode *fold_constants(ASTNode *node)
 {
@@ -646,128 +647,6 @@ void print_ast(ASTNode *node, int depth)
         {
             print_ast(node->body[i], depth + 1);
         }
-    }
-}
-
-int tempCount = 0;
-int labelCount = 0;
-
-char *new_temp()
-{
-    static char temp[10];
-    sprintf(temp, "t%d", tempCount++);
-    return temp;
-}
-
-char *new_label()
-{
-    static char label[10];
-    sprintf(label, "L%d", labelCount++);
-    return label;
-}
-
-char *generate_expr(ASTNode *node)
-{
-    if (!node)
-        return "";
-
-    char *t1, *t2, *result;
-
-    switch (node->type)
-    {
-    case AST_LITERAL:
-    case AST_IDENTIFIER:
-        return node->value;
-
-    case AST_BINARY_OP:
-        t1 = generate_expr(node->left);
-        t2 = generate_expr(node->right);
-        result = strdup_safe(new_temp());
-        printf("%s = %s %s %s\n", result, t1, node->value, t2);
-        return result;
-
-    default:
-        return "";
-    }
-}
-
-void generate_tac(ASTNode *node)
-{
-    if (!node)
-        return;
-
-    switch (node->type)
-    {
-    case AST_ASSIGNMENT:
-    {
-        char *rhs = generate_expr(node->right);
-        printf("%s = %s\n", node->left->value, rhs);
-        break;
-    }
-
-    case AST_IF_STMT:
-    {
-        char *cond = generate_expr(node->left);
-        char *falseLabel = new_label();
-        printf("ifFalse %s goto %s\n", cond, falseLabel);
-        generate_tac(node->right);
-        printf("%s:\n", falseLabel);
-        break;
-    }
-
-    case AST_WHILE_STMT:
-    {
-        char *startLabel = new_label();
-        char *endLabel = new_label();
-        printf("%s:\n", startLabel);
-        char *cond = generate_expr(node->left);
-        printf("ifFalse %s goto %s\n", cond, endLabel);
-        generate_tac(node->right);
-        printf("goto %s\n", startLabel);
-        printf("%s:\n", endLabel);
-        break;
-    }
-
-    case AST_FOR_STMT:
-    {
-        ASTNode *init = node->left;
-        ASTNode *condition = node->right->body[0];
-        ASTNode *update = node->right->body[1];
-        ASTNode *body = node->right->body[2];
-
-        generate_tac(init);
-
-        char *startLabel = new_label();
-        char *endLabel = new_label();
-        printf("%s:\n", startLabel);
-
-        char *c = generate_expr(condition);
-        printf("ifFalse %s goto %s\n", c, endLabel);
-
-        generate_tac(body);
-        generate_tac(update);
-
-        printf("goto %s\n", startLabel);
-        printf("%s:\n", endLabel);
-        break;
-    }
-
-    case AST_BLOCK:
-        for (int i = 0; i < node->body_size; i++)
-            generate_tac(node->body[i]);
-        break;
-
-    case AST_FUNC_CALL:
-        for (int i = 0; i < node->body_size; i++)
-        {
-            char *arg = generate_expr(node->body[i]);
-            printf("param %s\n", arg);
-        }
-        printf("call %s, %d\n", node->value, node->body_size);
-        break;
-
-    default:
-        break;
     }
 }
 

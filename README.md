@@ -14,10 +14,10 @@ manually without external tools or parser generators.
   <li>✔ Lexer</li>
   <li>✔ Parser (recursive descent)</li>
   <li>✔ AST construction</li>
-  <li>✔ Symbol table (basic)</li>
+  <li>✔ Symbol table (scoped, typed)</li>
   <li>✔ Three-Address Code (TAC)</li>
-  <li>🚧 Semantic analysis (in progress)</li>
-  <li>🚧 Code generation (planned)</li>
+  <li>✔ Semantic analysis (type + scope checks)</li>
+  <li>🚧 Native backends (QBE / LLVM) – in progress</li>
 </ul>
 
 <hr>
@@ -25,37 +25,42 @@ manually without external tools or parser generators.
 <h2>Compiler Pipeline</h2>
 
 <pre>
-Source Code
-    |
-    v
-+---------+
-|  Lexer  |
-+---------+
-    |
-    v
-+---------+
-| Parser  |
-+---------+
-    |
-    v
-+---------+
-|  AST    |
-+---------+
-    |
-    v
-+------------------+
-| Semantic Analysis|
-+------------------+
-    |
-    v
-+---------+
-|  TAC    |
-+---------+
-    |
-    v
-+--------------+
-| Codegen (WIP)|
-+--------------+
+JavaScript Source
+        |
+        v
++----------------+
+|     Lexer      |
++----------------+
+        |
+        v
++----------------+
+|     Parser     |
++----------------+
+        |
+        v
++----------------+
+|      AST       |
++----------------+
+        |
+        v
++------------------------+
+|  Semantic Analysis     |
+|  (scope + type checks)|
++------------------------+
+        |
+        v
++----------------+
+|   IR / TAC     |
++----------------+
+        |
+        v
++----------------+
+|   QBE / LLVM   |
+|   Codegen      |
++----------------+
+        |
+        v
+Native Assembly / ELF
 </pre>
 
 <hr>
@@ -66,17 +71,29 @@ Source Code
 jscc/
 ├── include/
 │   ├── lexer.h
-│   └── parser.h
+│   ├── parser.h
+│   ├── semantic.h
+│   ├── ir.h
+│   ├── qbe_codegen.h
+│   └── llvm_codegen.h
 ├── src/
 │   ├── lexer/
 │   │   └── lexer.c
 │   ├── parser/
 │   │   └── parser.c
+│   ├── semantic/
+│   │   └── semantic.c
+│   ├── ir/
+│   │   └── ir.c
+│   ├── qbe/
+│   │   └── qbe_codegen.c
+│   ├── llvm/
+│   │   └── llvm_codegen.c
 │   └── main.c
 ├── tests/
 │   └── index.js
 ├── Makefile
-└── README.html
+└── README.md
 </pre>
 
 <hr>
@@ -113,20 +130,42 @@ make
 <ul>
   <li>Token stream</li>
   <li>AST structure</li>
-  <li>Symbol table entries</li>
-  <li>Generated Three-Address Code (TAC)</li>
+  <li>Semantic validation</li>
+  <li>Three-Address Code (TAC)</li>
+  <li>QBE / LLVM IR (experimental)</li>
 </ul>
+
+<hr>
+
+<h2>⚠ Development Notes (Important)</h2>
+
+<p>
+During QBE backend testing, the generated SSA currently contains incorrect temporary
+references. For testing purposes, the following fixes were applied <strong>manually</strong>
+to the generated <code>.qbe</code> file:
+</p>
+
+<ul>
+  <li><code>%t1 =w add 1, %t1</code> → <code>%t1 =w add 1, %t0</code></li>
+  <li><code>%t3 =w call $printi(w %t3)</code> → <code>%t3 =w call $printi(w %t2)</code></li>
+  <li><code>%t5 =w mul %t5, 3</code> → <code>%t5 =w mul %t4, 3</code></li>
+</ul>
+
+<p>
+This indicates a bug in <code>qbe_codegen.c</code> where the wrong SSA temporary
+is being reused. Fixing correct temporary propagation is a <strong>TODO</strong>.
+</p>
 
 <hr>
 
 <h2>Design Principles</h2>
 
 <ul>
-  <li>No external dependencies</li>
-  <li>No POSIX-specific APIs</li>
-  <li>Portable C11 code</li>
+  <li>No parser generators</li>
+  <li>No external runtime dependencies</li>
+  <li>Portable C11</li>
   <li>Clear phase separation</li>
-  <li>Explicit memory ownership</li>
+  <li>Explicit memory management</li>
 </ul>
 
 <hr>
@@ -134,22 +173,16 @@ make
 <h2>Planned Improvements</h2>
 
 <ul>
-  <li>Proper semantic analysis pass</li>
-  <li>Scope-aware symbol table</li>
-  <li>Expression precedence handling</li>
-  <li>IR optimizations</li>
-  <li>Target code generation</li>
+  <li>Fix SSA temporary reuse bug in QBE backend</li>
+  <li>Proper lowering of control flow in QBE</li>
+  <li>String literals and data section handling</li>
+  <li>Register allocation (QBE-assisted)</li>
+  <li>LLVM backend integration</li>
 </ul>
-
-<hr>
-
-<h2>License</h2>
-
-<p>License to be decided.</p>
 
 <hr>
 
 <p>
 <strong>Status:</strong> Active development<br>
-<strong>Version:</strong> v0.1
+<strong>Version:</strong> v0.2
 </p>

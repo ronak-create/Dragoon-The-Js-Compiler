@@ -56,7 +56,7 @@ typedef struct ASTNode
     int body_size;
 } ASTNode;
 
-#define MAX_SYMBOLS 100
+#define PARSER_MAX_SYMBOLS 100
 
 typedef struct
 {
@@ -74,7 +74,7 @@ void print_ast(ASTNode *node, int depth);
 void printSymbolTable();
 void generate_tac(ASTNode *node);
 ASTNode *parse_statement(Token tokens[], int *index);
-
+ASTNode *create_node(ASTNodeType type, char *value);
 // Token get_next_token(FILE *file); // This function must be implemented by you in parser.c or another file
 
 #endif // PARSER_H

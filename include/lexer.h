@@ -30,4 +30,5 @@ int is_builtInObject(const char *str);
 int is_keyword(const char *str);
 Token get_next_token(FILE *file);
 
+
 #endif // LEXER_H
