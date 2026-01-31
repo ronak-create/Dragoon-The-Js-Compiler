@@ -110,6 +110,7 @@ QBE → Assembly → GCC → Native Executable
 <h2>Directory Structure</h2>
 
 <pre>
+(root-directory)
 ├── include
 │   ├── cfg.h
 │   ├── codegen.h
