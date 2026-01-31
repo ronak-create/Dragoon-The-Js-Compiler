@@ -1,9 +1,15 @@
-<h1>jscc – JavaScript Compiler (WIP)</h1>
+<h1>jscc – JavaScript Compiler (Experimental)</h1>
 
 <p>
-<strong>jscc</strong> is a work-in-progress JavaScript compiler written in <strong>C (C11)</strong>.
-This project focuses on understanding real compiler internals by implementing each phase
-manually without external tools or parser generators.
+<strong>jscc</strong> is an experimental JavaScript compiler written in
+<strong>C (C11)</strong>. The project focuses on understanding real compiler
+internals by implementing each phase manually, without parser generators
+or heavyweight frameworks.
+</p>
+
+<p>
+The compiler currently targets a <strong>Unix-style toolchain</strong> and
+generates native executables via the <strong>QBE</strong> backend.
 </p>
 
 <hr>
@@ -12,13 +18,39 @@ manually without external tools or parser generators.
 
 <ul>
   <li>✔ Lexer</li>
-  <li>✔ Parser (recursive descent)</li>
+  <li>✔ Recursive-descent parser</li>
   <li>✔ AST construction</li>
-  <li>✔ Symbol table (scoped, typed)</li>
-  <li>✔ Three-Address Code (TAC)</li>
-  <li>✔ Semantic analysis (type + scope checks)</li>
-  <li>🚧 Native backends (QBE / LLVM) – in progress</li>
+  <li>✔ Semantic analysis (scope + basic type checks)</li>
+  <li>✔ Intermediate Representation (IR / TAC)</li>
+  <li>✔ Control Flow Graph (CFG)</li>
+  <li>✔ Constant folding & dead code elimination</li>
+  <li>✔ QBE backend (end-to-end working)</li>
+  <li>🚧 LLVM backend (planned)</li>
 </ul>
+
+<hr>
+
+<h2>Platform Support</h2>
+
+<p>
+<strong>Supported:</strong>
+</p>
+<ul>
+  <li>Linux</li>
+  <li>WSL (Windows Subsystem for Linux)</li>
+</ul>
+
+<p>
+<strong>Not supported:</strong>
+</p>
+<ul>
+  <li>Native Windows toolchains (CMD / PowerShell, MinGW, MSVC)</li>
+</ul>
+
+<p>
+The QBE backend emits Unix-style assembly and expects a POSIX environment.
+Windows users should run the compiler inside <strong>WSL</strong>.
+</p>
 
 <hr>
 
@@ -45,7 +77,7 @@ JavaScript Source
         v
 +------------------------+
 |  Semantic Analysis     |
-|  (scope + type checks)|
+|  (scope + type checks) |
 +------------------------+
         |
         v
@@ -55,12 +87,22 @@ JavaScript Source
         |
         v
 +----------------+
-|   QBE / LLVM   |
-|   Codegen      |
+|     CFG        |
 +----------------+
         |
         v
-Native Assembly / ELF
++------------------------+
+|  Optimizations         |
+|  (const fold, DCE)     |
++------------------------+
+        |
+        v
++----------------+
+|   QBE IR       |
++----------------+
+        |
+        v
+QBE → Assembly → GCC → Native Executable
 </pre>
 
 <hr>
@@ -74,49 +116,68 @@ jscc/
 │   ├── parser.h
 │   ├── semantic.h
 │   ├── ir.h
-│   ├── qbe_codegen.h
-│   └── llvm_codegen.h
+│   ├── cfg.h
+│   ├── opt.h
+│   └── qbe_codegen.h
 ├── src/
 │   ├── lexer/
-│   │   └── lexer.c
 │   ├── parser/
-│   │   └── parser.c
 │   ├── semantic/
-│   │   └── semantic.c
 │   ├── ir/
-│   │   └── ir.c
+│   ├── cfg/
+│   ├── opt/
 │   ├── qbe/
-│   │   └── qbe_codegen.c
-│   ├── llvm/
-│   │   └── llvm_codegen.c
 │   └── main.c
 ├── tests/
 │   └── index.js
+├── tmp/
+│   ├── out.qbe
+│   └── out.s
 ├── Makefile
 └── README.md
 </pre>
 
 <hr>
 
-<h2>Supported JavaScript Features</h2>
+<h2>Supported JavaScript Subset</h2>
 
 <ul>
   <li><code>let</code> and <code>const</code> declarations</li>
-  <li>Assignments and literals (number, string, boolean)</li>
-  <li>Binary expressions (<code>+</code>, <code>-</code>, <code>*</code>, <code>/</code>, <code>&lt;</code>, <code>===</code>)</li>
+  <li>Integer literals (decimal, hex, binary)</li>
+  <li>Boolean literals</li>
+  <li>Binary expressions (<code>+</code>, <code>-</code>, <code>*</code>, <code>/</code>)</li>
+  <li>Comparisons (<code>===</code>, <code>&lt;</code>)</li>
   <li><code>if / else</code> statements</li>
-  <li><code>for</code> and <code>while</code> loops</li>
+  <li><code>for</code> loops (basic form)</li>
   <li>Pre/Post increment (<code>++i</code>, <code>i++</code>)</li>
-  <li><code>console.log()</code> function calls</li>
+  <li><code>console.log()</code> for integer expressions</li>
+</ul>
+
+<hr>
+
+<h2>Requirements</h2>
+
+<ul>
+  <li>Linux or WSL</li>
+  <li>GCC (or Clang)</li>
+  <li>QBE (<a href="https://c9x.me/compile/">https://c9x.me/compile/</a>)</li>
 </ul>
 
 <hr>
 
 <h2>Build</h2>
 
+<p>
+The project uses a Makefile to manage the build.
+</p>
+
 <pre>
 make
 </pre>
+
+<p>
+This produces the <code>jscc</code> executable in the project root.
+</p>
 
 <hr>
 
@@ -126,35 +187,69 @@ make
 ./jscc tests/index.js
 </pre>
 
-<p>The compiler outputs:</p>
+<hr>
+
+<h2>Running Your Own JavaScript File</h2>
+
+<p>
+You can run the compiler on any JavaScript file by passing its path:
+</p>
+
+<pre>
+./jscc path/to/file.js
+</pre>
+
+<p>
+Using the Makefile:
+</p>
+
+<pre>
+make run FILE=path/to/file.js
+</pre>
+
+<p>
+Examples:
+</p>
+
+<pre>
+make run FILE=tests/index.js
+make run FILE=examples/loops.js
+</pre>
+
+<p>
+If no file is specified, the Makefile defaults to <code>tests/index.js</code>.
+</p>
+
+<p>
+By default, the compiler:
+</p>
 <ul>
-  <li>Token stream</li>
-  <li>AST structure</li>
-  <li>Semantic validation</li>
-  <li>Three-Address Code (TAC)</li>
-  <li>QBE / LLVM IR (experimental)</li>
+  <li>Generates QBE IR (<code>tmp/out.qbe</code>)</li>
+  <li>Invokes QBE to produce assembly</li>
+  <li>Invokes GCC to produce a native executable</li>
+  <li>Runs the executable automatically</li>
 </ul>
 
 <hr>
 
-<h2>⚠ Development Notes (Important)</h2>
-
-<p>
-During QBE backend testing, the generated SSA currently contains incorrect temporary
-references. For testing purposes, the following fixes were applied <strong>manually</strong>
-to the generated <code>.qbe</code> file:
-</p>
+<h2>Command-Line Flags</h2>
 
 <ul>
-  <li><code>%t1 =w add 1, %t1</code> → <code>%t1 =w add 1, %t0</code></li>
-  <li><code>%t3 =w call $printi(w %t3)</code> → <code>%t3 =w call $printi(w %t2)</code></li>
-  <li><code>%t5 =w mul %t5, 3</code> → <code>%t5 =w mul %t4, 3</code></li>
+  <li><code>-d</code> : Enable debug output (AST, IR, CFG)</li>
+  <li><code>-q</code> : Stop after emitting QBE IR</li>
 </ul>
 
-<p>
-This indicates a bug in <code>qbe_codegen.c</code> where the wrong SSA temporary
-is being reused. Fixing correct temporary propagation is a <strong>TODO</strong>.
-</p>
+<hr>
+
+<h2>Limitations</h2>
+
+<ul>
+  <li>Integer-only code generation</li>
+  <li>Strings parsed but not yet lowered in codegen</li>
+  <li>No functions or closures</li>
+  <li>No garbage collection</li>
+  <li>No native Windows backend</li>
+</ul>
 
 <hr>
 
@@ -163,9 +258,9 @@ is being reused. Fixing correct temporary propagation is a <strong>TODO</strong>
 <ul>
   <li>No parser generators</li>
   <li>No external runtime dependencies</li>
-  <li>Portable C11</li>
-  <li>Clear phase separation</li>
-  <li>Explicit memory management</li>
+  <li>Portable C11 code</li>
+  <li>Explicit phase separation</li>
+  <li>Educational clarity over performance</li>
 </ul>
 
 <hr>
@@ -173,16 +268,16 @@ is being reused. Fixing correct temporary propagation is a <strong>TODO</strong>
 <h2>Planned Improvements</h2>
 
 <ul>
-  <li>Fix SSA temporary reuse bug in QBE backend</li>
-  <li>Proper lowering of control flow in QBE</li>
-  <li>String literals and data section handling</li>
-  <li>Register allocation (QBE-assisted)</li>
-  <li>LLVM backend integration</li>
+  <li>Full control-flow lowering in QBE</li>
+  <li>String literals & data section support</li>
+  <li>Improved type tracking in IR</li>
+  <li>LLVM backend</li>
+  <li>Better CLI and diagnostics</li>
 </ul>
 
 <hr>
 
 <p>
 <strong>Status:</strong> Active development<br>
-<strong>Version:</strong> v0.2
+<strong>Version:</strong> v0.3
 </p>

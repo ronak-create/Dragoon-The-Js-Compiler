@@ -1,9 +1,8 @@
 #ifndef QBE_CODEGEN_H
 #define QBE_CODEGEN_H
 
-#include "parser.h"
+#include "ir.h"
 
-/* Emit QBE IR to file */
-void qbe_codegen(ASTNode *program, const char *out_qbe);
+void qbe_codegen_ir(IRInstr *ir, int ir_count, const char *out_qbe);
 
 #endif
