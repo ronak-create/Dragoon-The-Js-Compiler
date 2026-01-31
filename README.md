@@ -110,31 +110,39 @@ QBE → Assembly → GCC → Native Executable
 <h2>Directory Structure</h2>
 
 <pre>
-jscc/
-├── include/
-│   ├── lexer.h
-│   ├── parser.h
-│   ├── semantic.h
-│   ├── ir.h
+├── include
 │   ├── cfg.h
+│   ├── codegen.h
+│   ├── ir.h
+│   ├── lexer.h
 │   ├── opt.h
-│   └── qbe_codegen.h
-├── src/
-│   ├── lexer/
-│   ├── parser/
-│   ├── semantic/
-│   ├── ir/
-│   ├── cfg/
-│   ├── opt/
-│   ├── qbe/
+│   ├── parser.h
+│   ├── qbe_codegen.h
+│   └── semantic.h
+├── src
+│   ├── cfg
+│   │   └── cfg.c
+│   ├── codegen
+│   │   └── codegen.c
+│   ├── ir
+│   │   └── ir.c
+│   ├── lexer
+│   │   └── lexer.c
+│   ├── opt
+│   │   └── opt.c
+│   ├── parser
+│   │   └── parser.c
+│   ├── qbe
+│   │   └── qbe_codegen.c
+│   ├── semantic
+│   │   └── semantic.c
 │   └── main.c
-├── tests/
+├── tests
 │   └── index.js
-├── tmp/
-│   ├── out.qbe
-│   └── out.s
+├── .gitignore
 ├── Makefile
-└── README.md
+├── README.md
+└── qbe
 </pre>
 
 <hr>
